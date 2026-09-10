@@ -143,10 +143,12 @@ a genuine hardware bass lift that still tracks the volume slider. A one-off gain
 overwritten the next time you touch the volume — hence the daemon, which maintains
 
 ```
-gain(0x03) = min( gain(0x02) + OFFSET, CAP )
+gain(0x03) = min( system, CAP )
+gain(0x02) = max( gain(0x03) − SPREAD, FLOOR )
 ```
 
-Both are at the top of `woofer.sh`. Defaults: `OFFSET=16` (16 × 0.75 dB ≈ +12 dB) and `CAP=0x52`.
+All three are at the top of `woofer.sh`. See [One knob, not two](#one-knob-not-two) for why it ended up
+as a single parameter.
 
 The pin amps on this codec are **mute-only** (`AMP-OUT cap = 0x80000000`), so all gain lives on the DACs —
 do not waste time trying to set a level on `0x17` itself. The DAC amps have 87 steps of 0.75 dB, maximum
@@ -221,18 +223,18 @@ covers 120 Hz to 1 kHz. So *changing their relative level is a tone control*, an
 [`scripts/woofer.sh`](../scripts/woofer.sh) maintains it:
 
 ```
-gain(0x03) = max( system, min(system + OFFSET, CAP) )     # lower pair, boost only
-gain(0x02) = max( system − ATTEN, FLOOR )                 # upper pair, trim
+gain(0x03) = min( system, CAP )                    # lower pair
+gain(0x02) = max( gain(0x03) − SPREAD, FLOOR )     # upper pair
 ```
 
-Defaults: `OFFSET=16` (≈ +12 dB), `CAP=0x48`, `ATTEN=8` (≈ −6 dB), `FLOOR=0x20`.
+Defaults: `SPREAD=8` (≈ +6 dB), `CAP=0x52`, `FLOOR=0x20`.
 
 **Why `CAP=0x48`.** At 200 Hz the woofers saturate exactly there — measured, every value above it is identical
 within error. Pushing higher gains nothing at the bottom and only inflates 300 Hz–1 kHz, which is the boxy
 region. So the cap limits the *boost* and never attenuates: at high system volume the lower pair simply tracks
 the slider, because the driver is already at its limit.
 
-**Why `ATTEN` is small.** Trimming the upper pair hits the 2 kHz peak precisely — 12 steps drops 2 kHz by
+**Why `SPREAD` is modest.** Trimming the upper pair hits the 2 kHz peak precisely — 12 steps drops 2 kHz by
 4.6 dB while 500 Hz falls only 1.1 dB, because 500 Hz comes from the *other* pair. But it also takes 4 kHz
 down with it: at 12 steps the top end lost 6.7 dB and the result was noticeably dull. Eight steps was settled on by ear — four was barely audible, twelve was
 dull. Measurement had reached its limit by then: a single microphone position cannot resolve the last few
@@ -249,9 +251,8 @@ levels are not comparable between sessions. From here it is taste.
 
 | Change | Effect |
 |---|---|
-| `OFFSET` up | more bass at low and medium volume; no effect at high volume, where `CAP` binds |
-| `CAP` up | more midrange (300 Hz–1 kHz) but no more bass — 200 Hz is already saturated at `0x48` |
-| `ATTEN` up | less harshness at 2 kHz, but also less air at 4 kHz. Past ~5 steps it starts to sound dull |
+| `SPREAD` up | more bass and less harshness at 2 kHz, but also less air at 4 kHz. Past ~12 steps it sounds dull |
+| `CAP` down | protects the woofers at high volume; also lowers overall loudness there |
 
 After editing:
 
@@ -262,6 +263,24 @@ sudo launchctl kickstart -k system/com.local.woofer
 
 Changes take about 30 seconds to apply, and only after the volume slider moves — the daemon acts on the
 moment macOS sets both DACs to the same value.
+
+### One knob, not two
+
+An earlier version had two: a boost for the lower pair and a trim for the upper. They stack, and the
+result depended on volume in a way that sounded wrong — at 40 % the spread reached 18 dB and the bass
+boomed, while at 85 % the boost hit its ceiling and never applied, leaving a well-balanced 6 dB. The
+machine sounded better loud than quiet, which is the wrong way round for a tone control.
+
+So there is one parameter now, `SPREAD`, and it holds the same distance between the pairs at every volume:
+
+```
+gain(0x03) = min(system, CAP)          # lower pair, never boosted above the slider
+gain(0x02) = max(gain(0x03) − SPREAD, FLOOR)
+```
+
+The upper pair is tied to the *lower* one rather than to the slider. Otherwise at 100 % the lower pair hits
+`CAP` while the upper keeps rising, and the spread collapses from 6 dB to 2 dB — the tone would change at
+maximum volume. Verified: +6.0 dB at 25, 40, 55, 70, 85 and 100 %.
 
 ### Reading DAC gains is not always reliable
 
