@@ -22,6 +22,7 @@
 | Экран 1920×1200 | ✅ | |
 | Внешний монитор (HDMI / USB-C) | ✅ | См. [графику](docs/ru/graphics-and-display.md) |
 | Звук — динамики, наушники | ✅ | AppleALC `layout-id 13` |
+| Звук — **низкочастотные динамики** | ✅ | В прошивке выключены — [как включили](docs/ru/woofers.md) |
 | Звук — встроенный микрофон | ✅ | Нужна небольшая утилита, см. [звук](docs/ru/audio-keyboard-cardreader.md) |
 | **Wi-Fi** | ✅ | Intel AX201 через `itlwm` + HeliPort |
 | Wi-Fi — нативное меню macOS | ⛔ Недостижимо | Нужен root-патчинг OCLP — [почему](docs/ru/wifi-and-bluetooth.md) |
@@ -97,6 +98,7 @@
 | [Wi-Fi и Bluetooth](docs/ru/wifi-and-bluetooth.md) | Почему `itlwm`, почему нативный AirportItlwm — тупик, особенности Bluetooth |
 | [Графика и экран](docs/ru/graphics-and-display.md) | Патчи фреймбуфера, отключение дискретной карты, внешние мониторы |
 | [Карта портов USB](docs/ru/usb-mapping.md) | Как устроена и как её строить |
+| [Низкочастотные динамики](docs/ru/woofers.md) | Басовые динамики 9500 отключены в прошивке. Как их включить, с измерениями |
 | [Звук, клавиатура, картридер](docs/ru/audio-keyboard-cardreader.md) | Мелкие правки, включая беду с русской раскладкой |
 | [SMBIOS и Apple ID](docs/ru/smbios.md) | Согласованность серийников, проверка board-ID, чего избегать |
 | [Настройки BIOS](docs/ru/bios-settings.md) | Что менять в прошивке Dell |
