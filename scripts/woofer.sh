@@ -10,8 +10,9 @@
 
 A=/usr/local/bin/alc-verb
 LOG=/var/log/woofer.log
-OFFSET=13        # shagov po 0.75 dB nad urovnem tviterov (~ +10 dB)
-CAP=0x52         # potolok. 0x57 - maksimum kodeka, tam slyshno lyogkoe drebezzhanie.
+OFFSET=16        # shagov po 0.75 dB nad urovnem tviterov (~ +12 dB)
+CAP=0x52         # potolok po izmereniyam: na 200 Gc uroven nasyshchaetsya uzhe k 0x48,
+                 # a na 120 Gc vyshe 0x52 rezko rastut iskazheniya (57% THD na 0x57).
 
 log(){ echo "[$(date '+%F %T')] $*" >> "$LOG"; }
 v(){ sudo -n "$A" "$1" "$2" "$3" 2>/dev/null | tail -1; }

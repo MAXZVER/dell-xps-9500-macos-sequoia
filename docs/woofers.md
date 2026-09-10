@@ -99,7 +99,7 @@ overwritten the next time you touch the volume — hence the daemon, which maint
 gain(0x03) = min( gain(0x02) + OFFSET, CAP )
 ```
 
-Both are at the top of `woofer.sh`. Defaults: `OFFSET=13` (13 × 0.75 dB ≈ +10 dB) and `CAP=0x52`.
+Both are at the top of `woofer.sh`. Defaults: `OFFSET=16` (16 × 0.75 dB ≈ +12 dB) and `CAP=0x52`.
 
 The pin amps on this codec are **mute-only** (`AMP-OUT cap = 0x80000000`), so all gain lives on the DACs —
 do not waste time trying to set a level on `0x17` itself. The DAC amps have 87 steps of 0.75 dB, maximum
@@ -107,62 +107,81 @@ do not waste time trying to set a level on `0x17` itself. The DAC amps have 87 s
 
 ## Measurements
 
-Measured with the internal microphone (`tools/rec.swift` to record, `tools/measure-thd.py` to analyse),
-input gain pinned so the levels are comparable between runs.
+Measured with an **external microphone** — a Logitech C930e on a stand 10 cm from the laptop, recorded on a
+separate machine with ffmpeg, analysed with a Goertzel filter at the tone frequency. Room noise floor during
+the run: −98.4 dB RMS.
 
-**Before and after, at 200 Hz:**
+> **An earlier version of this document had different numbers, taken with the laptop's own microphone. Those
+> were wrong and have been replaced.** An internal microphone sits in the chassis and picks up structure-borne
+> vibration, so readings depend heavily on what the laptop is standing on — and it invented distortion that
+> is not there. Do not characterise these speakers with the built-in mic.
 
-| | Level |
-|---|---|
-| Tweeters only (stock) | **−108.0 dB** |
-| Woofers enabled, gain `0x4e` | **−54.7 dB** |
+**Tweeters alone:**
 
-That is a 53 dB difference. The tweeters produce essentially nothing below about 200 Hz — the "no bass"
-complaint is literally accurate, not a matter of taste.
+| Tone | Level | THD |
+|---|---|---|
+| 1 kHz | **−40.4 dB** | 0.6 % |
+| 200 Hz | **−127.5 dB** | — (below the noise floor) |
 
-**Distortion versus gain, woofers at 200 Hz:**
+The tweeters produce *nothing* at 200 Hz — 87 dB below their own 1 kHz output, and below the room noise. The
+"no bass" complaint is literal. At 1 kHz they are clean: 0.6 % THD.
+
+**Woofers alone, 200 Hz, sweeping the DAC gain:**
 
 | DAC gain | Level | THD |
 |---|---|---|
-| `0x41` | −67.0 dB | 0.7 % |
-| `0x48` | −62.1 dB | 1.8 % |
-| `0x4e` | −54.6 dB | 0.7 % |
-| `0x52` | −52.6 dB | 2.6 % |
-| `0x57` (max) | −51.6 dB | **13.8 %** |
+| `0x41` | −42.8 dB | 1.1 % |
+| `0x48` | **−29.4 dB** | 2.4 % |
+| `0x4e` | −29.3 dB | 2.7 % |
+| `0x52` | −29.0 dB | 2.6 % |
+| `0x55` | −29.5 dB | 2.7 % |
+| `0x57` (max) | −29.3 dB | 2.8 % |
 
-Above `0x52` there is audible buzz, confirmed by ear as well as by measurement. `CAP=0x52` is the default
-for that reason; lower it to `0x4e` if you want to be conservative.
+Two things fall out of this. Against the tweeters' −127.5 dB, the woofers give −29 dB at the same
+frequency — about **98 dB more output at 200 Hz**. And the level **saturates at `0x48`**: everything above it
+is identical within measurement error, so gain past that point buys nothing here.
 
-**A control, because the microphone is a suspect too.** Small internal microphones can rattle at high sound
-pressure, which would fake distortion. Driving the *tweeters* to the same measured levels at 1 kHz:
+**Woofers alone, 120 Hz:**
 
-| Level | Tweeters @1 kHz | Woofers @200 Hz |
+| DAC gain | Level | THD |
 |---|---|---|
-| ≈ −54 dB | 32 % THD | 2.6 % THD |
+| `0x4e` | −45.3 dB | 14.2 % |
+| `0x52` | −43.6 dB | 9.2 % |
+| `0x55` | −42.5 dB | 12.2 % |
+| `0x57` (max) | −39.9 dB | **57.2 %** |
 
-If the microphone were the bottleneck, both would look the same at equal sound pressure. They differ by a
-factor of twelve, so the distortion being measured is in the drivers, not in the recording chain. (Note in
-passing what this says about the tweeters: 47 % THD at full gain. They are not good speakers.)
+Lower down there is still headroom in level, but also a cliff: at the codec maximum the third harmonic reaches
+−44.7 dB and THD hits 57 %. That is the driver bottoming out, and it is audible as a buzz.
+
+`CAP=0x52` follows from these two tables — at 200 Hz the output is already saturated by then, and at 120 Hz it
+is the least distorted of the measured points.
 
 ## Caveats
 
-- The woofers are small. This gives you real low-mid content around 100–250 Hz; it does not give you deep
-  bass. Nothing was measurable at 70 Hz from either driver — though the internal microphone may not reach
-  that low either, so treat that as inconclusive rather than proven absent.
+- The woofers are small. This gives real low-mid content around 120–250 Hz; it is not deep bass. Nothing was
+  measurable at 70 Hz.
 - `alcverbs=1` must stay in boot-args or the daemon silently does nothing.
 - The daemon polls every 3 seconds. That is cheap, but it does mean a brief lag after a volume change.
+- Sending gain verbs by hand can leave macOS's idea of the volume out of step with the codec — the slider
+  reads 85 % while the DAC sits at zero. Nudging the volume resyncs it. This only happens after manual
+  experimentation, not in normal use.
 
 ## Recording tools
 
 `tools/rec.swift` records from the default input to a WAV; `tools/measure-thd.py` reports the level of a
 fundamental plus its second and third harmonics.
 
-```bash
-swiftc -O tools/rec.swift -o ~/tools/rec
-~/tools/rec /tmp/r.wav 4
-python3 tools/measure-thd.py /tmp/r.wav 200
+**Prefer an external microphone on a second machine.** The internal one is not a usable instrument here, for
+the reasons above. The setup that produced the numbers in this document was: tone files on the Mac played with
+`afplay` over SSH, recorded on a Windows box with
+
+```
+ffmpeg -f dshow -i audio="Microphone (...)" -t 5 -ac 1 -ar 48000 -y out.wav
 ```
 
-One practical note: **a process started over SSH cannot use the microphone.** macOS denies it silently and
-hands you a file full of zeros rather than prompting. Launch the measurement from a GUI session instead —
-`open -a Terminal /path/to/script.command` works and triggers the permission prompt properly.
+and analysed with `tools/measure-thd.py`. Keep the laptop and the microphone still between runs, or absolute
+levels are not comparable.
+
+If you do use the built-in microphone: **a process started over SSH cannot reach it.** macOS denies access
+silently and hands you a file full of zeros rather than prompting. Launch from a GUI session instead —
+`open -a Terminal /path/to/script.command` triggers the permission prompt properly.
