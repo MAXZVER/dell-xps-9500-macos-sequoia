@@ -102,29 +102,67 @@ sudo cp alc-verb /usr/local/bin/
 
 (`UserKernelShared.h` lives outside the `alc-verb` directory and is easy to miss.)
 
-## A real crossover is not reachable
+## The crossover is real — and it is already running
 
-Worth stating so nobody spends time on it. Feeding the woofers only low frequencies and the tweeters only
-high would be the right way to make this machine sound good — and it cannot be done here.
+**An earlier version of this document said a crossover was unreachable. That was wrong, and this section
+replaces it.**
 
-Layout 13's path map already looks promising:
+AppleHDA's speaker path has a *software DSP chain*, described in AppleALC's layout file. For layout 13 the
+internal-speaker chain contains exactly one function:
 
 ```
-0x14 → DAC 0x02 [ch1, ch2]
-0x17 → DAC 0x03 [ch5, ch6]      ← a separate channel pair
+IntSpeaker → SignalProcessing → SoftwareDSP → DspFunction0
+    DspFuncName: DspCrossover2Way
 ```
 
-But **AppleHDA keeps the built-in output at two channels regardless.** With the pin declared and the path
-routed, `kAudioStreamPropertyAvailableVirtualFormats` still offers `2ch` only, and the `ch5/ch6` path is
-never activated. Tested with two different pin associations — matching `0x14`'s group (assoc 1, seq 1) and a
-separate one (assoc 6, as layout 93 uses) — no difference.
+A two-way crossover. It takes the stereo stream and splits it by frequency, and the path map shows where the
+halves go:
 
-AppleHDA also cannot be made to re-enumerate without a reboot: `kmutil unload -b com.apple.driver.AppleHDA`
-fails with `unsupported function`, and restarting `coreaudiod` does not rebuild the device.
+```
+0x14 → DAC 0x02 [ch1, ch2]      high band → tweeters
+0x17 → DAC 0x03 [ch5, ch6]      low band  → woofers
+```
 
-What is left in theory is a custom `Platforms` XML declaring a genuine multichannel device, which does need
-an AppleALC rebuild and therefore Xcode — plus crossover DSP software, which macOS does not provide. Neither
-step is proven to work. The practical alternative is a system-wide EQ, shaped from the measured curves.
+Those `ch5/ch6` bindings are not an unused multichannel leftover, which is what they looked like. They are the
+crossover's low-frequency output. CoreAudio stays a two-channel device because the split happens *inside the
+driver*, which is why looking at `kAudioStreamPropertyAvailableVirtualFormats` was the wrong test.
+
+It is confirmed running, not merely declared:
+
+```bash
+ioreg -l -w0 | grep -oE '"Dsp[A-Za-z0-9]+"=[0-9]+' | grep -v '=0$'
+```
+
+```
+"DspFunc2WayCrossover" = 1      ← one live instance
+"DspFuncEQ"            = 2      ← these two are the mic and line-in chains
+"DspFuncGain"          = 2
+"DspParameter"         = 56
+"DspPatchPoint"        = 24
+```
+
+The crossover comes alive as soon as node `0x17`'s pin is configured — before that AppleHDA discards the low
+path and there is nothing to split. So the pin-config fix above does more than switch the woofers on: it
+completes a properly crossed two-way system that was designed into the layout all along.
+
+### What this means for the tone control
+
+It means **do not use it.** Shifting level between the pairs de-balances a system that is already crossed
+correctly, which is exactly what was heard: −6 dB on the upper pair sounded fine on bass-heavy material and
+put audible holes in dense rock. `SPREAD=0` is not a neutral compromise, it is the correct setting.
+
+### What is still missing: an EQ on the speaker path
+
+Both `DspFuncEQ` instances belong to the input chains. The speaker chain has the crossover and nothing else —
+no equalisation, no gain stage. That is the remaining gap, and the measured target curve above is what should
+go there.
+
+Adding a `DspEqualization32` function to the `IntSpeaker` chain would give a **32-band EQ inside the driver**:
+system-wide, applying to every application, with no virtual audio device and no interference with the volume
+keys. It lives in the layout XML, which is a compiled resource, so it does need an AppleALC rebuild and
+therefore Xcode. Unlike the crossover attempt, this one has a clear mechanism — the format is right there in
+`Resources/ALC289/layout13.xml`, and the input chains show a working `DspEqualization32` with its `Filter`
+array to copy from.
 
 ## Why DAC 0x03, and why a daemon
 
