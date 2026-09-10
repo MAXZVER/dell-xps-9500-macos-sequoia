@@ -30,42 +30,54 @@ There is no separate amplifier chip involved. It is one codec, one missing pin d
 property exists in the IORegistry — but AppleHDA reads the pin defaults straight from the codec and ignores
 the injected value. Verified: after a reboot with the property set, `0x17` still read back `0x411111F0`.
 
-**Changing the AppleALC layout does not help either.** AppleALC's `Resources/ALC289/` contains only DSP
-graph definitions (`layoutNN.xml`, `PlatformsNN.xml`) — there is no `ConfigData`, so AppleALC never sends
-pin-configuration verbs for this codec at all. Layout 13 and layout 93 are both XPS 9500 profiles and
-neither enables `0x17`.
+**Switching to another AppleALC layout is not the answer either** — though for a subtler reason than it first
+appears. `Resources/ALC289/` in the AppleALC repository holds only DSP graph definitions (`layoutNN.xml`,
+`PlatformsNN.xml`), which is what led to an early conclusion here that AppleALC carries no pin data for this
+codec at all. That was wrong: the pin configurations live in `Resources/PinConfigs.kext/Contents/Info.plist`
+and end up in the built kext's own `Info.plist`. Layout 13 has an entry there — it just omits node `0x17`.
+Layout 93 does set it, so switching to 93 *would* make the woofers play, at the cost of its own path map
+(both pairs on DAC `0x02`, no separate level control) and its different microphone pins.
 
 ## What does work
 
-Send the verbs to the codec at runtime with **`alc-verb`**, the utility that ships in the
-[AppleALC source tree](https://github.com/acidanthera/AppleALC/tree/master/alc-verb).
+Two things are needed, and they are separate:
 
-**1. Enable verb support.** Add `alcverbs=1` to your boot arguments.
+**A. Make the pin configuration correct at boot** — this is what actually turns the woofers on, and it needs
+no daemon and no compiling.
 
-**2. Build `alc-verb`** (needs Command Line Tools):
+**B. Hold the woofers louder than the tweeters** — optional, for a bass lift; this does need a small daemon.
 
-```bash
-mkdir -p /tmp/av && cd /tmp/av
-curl -sLO https://raw.githubusercontent.com/acidanthera/AppleALC/master/alc-verb/main.c
-curl -sLO https://raw.githubusercontent.com/acidanthera/AppleALC/master/alc-verb/hdaverb.h
-curl -sLO https://raw.githubusercontent.com/acidanthera/AppleALC/master/AppleALC/UserKernelShared.h
-clang -O2 -framework IOKit -framework CoreFoundation main.c -o alc-verb
-sudo cp alc-verb /usr/local/bin/
+### A. The pin config, permanently
+
+AppleALC reads its pin configurations from `HDAConfigDefault` in **its own bundle's `Info.plist`** — a plain
+file, not something compiled into the binary. So it can simply be edited.
+
+In `EFI/OC/Kexts/AppleALC.kext/Contents/Info.plist`, under
+`IOKitPersonalities → as.vit9696.AppleALC → HDAConfigDefault`, find the entry with `CodecID = 283902601`
+(`0x10EC0289`) and `LayoutID = 13`, and append four verbs to its `ConfigData`:
+
+```
+01771c11 01771d01 01771e17 01771f90     →  pin 0x17 = 0x90170111
 ```
 
-**3. The verbs themselves:**
+Association 1, sequence 1 — the same group as node `0x14` (`0x90170110`), which keeps its firmware value.
 
-```bash
-alc-verb 0x17 0x71c 0x30     # pin config byte 0  ┐
-alc-verb 0x17 0x71d 0x01     # pin config byte 1  ├─ 0x90170130 = internal speaker
-alc-verb 0x17 0x71e 0x17     # pin config byte 2  │
-alc-verb 0x17 0x71f 0x90     # pin config byte 3  ┘
-alc-verb 0x17 0x701 0x01     # connection select → DAC 0x03
-alc-verb 0x17 0x707 0x40     # pin widget control: output enable
-alc-verb 0x17 0x300 0xb000   # output amp, both channels, unmute
-```
+That is the whole fix. Reboot and the woofers play, with nothing running in userspace.
 
-**4. Make it permanent** with [`scripts/woofer.sh`](../scripts/woofer.sh) and
+> This omission is upstream, not local: AppleALC's layout-13 entry is *named* "XPS 15 9500 4 Speakers" but
+> never sets node `0x17`. Submitted as
+> [acidanthera/AppleALC#965](https://github.com/acidanthera/AppleALC/pull/965) — once merged, this manual edit
+> becomes unnecessary. `layout-id 93` (XPS 9500 4K) already sets the pin, which is why that layout drives all
+> four speakers today.
+
+Verbs for pin-widget enable (`0x707`) and connection select (`0x701`) were tried too and are **not** needed:
+AppleHDA does both itself once the pin is declared. They also do not stick — reading `0xf07` after boot
+returns `0` even while the woofers are audibly playing, because the pin is enabled only for the duration of
+a stream.
+
+### B. The bass lift, with a daemon
+
+Optional. See [`scripts/woofer.sh`](../scripts/woofer.sh) and
 [`scripts/com.local.woofer.plist`](../scripts/com.local.woofer.plist):
 
 ```bash
@@ -76,8 +88,43 @@ sudo chown root:wheel /Library/LaunchDaemons/com.local.woofer.plist
 sudo launchctl bootstrap system /Library/LaunchDaemons/com.local.woofer.plist
 ```
 
-The daemon waits for audio to come up, applies the verbs, and re-applies them if the codec is reset —
-which happens on wake and when the output device changes.
+It needs `alc-verb`, which is in the [AppleALC source tree](https://github.com/acidanthera/AppleALC/tree/master/alc-verb)
+and needs `alcverbs=1` in boot-args:
+
+```bash
+mkdir -p /tmp/av && cd /tmp/av
+curl -sLO https://raw.githubusercontent.com/acidanthera/AppleALC/master/alc-verb/main.c
+curl -sLO https://raw.githubusercontent.com/acidanthera/AppleALC/master/alc-verb/hdaverb.h
+curl -sLO https://raw.githubusercontent.com/acidanthera/AppleALC/master/AppleALC/UserKernelShared.h
+clang -O2 -framework IOKit -framework CoreFoundation main.c -o alc-verb
+sudo cp alc-verb /usr/local/bin/
+```
+
+(`UserKernelShared.h` lives outside the `alc-verb` directory and is easy to miss.)
+
+## A real crossover is not reachable
+
+Worth stating so nobody spends time on it. Feeding the woofers only low frequencies and the tweeters only
+high would be the right way to make this machine sound good — and it cannot be done here.
+
+Layout 13's path map already looks promising:
+
+```
+0x14 → DAC 0x02 [ch1, ch2]
+0x17 → DAC 0x03 [ch5, ch6]      ← a separate channel pair
+```
+
+But **AppleHDA keeps the built-in output at two channels regardless.** With the pin declared and the path
+routed, `kAudioStreamPropertyAvailableVirtualFormats` still offers `2ch` only, and the `ch5/ch6` path is
+never activated. Tested with two different pin associations — matching `0x14`'s group (assoc 1, seq 1) and a
+separate one (assoc 6, as layout 93 uses) — no difference.
+
+AppleHDA also cannot be made to re-enumerate without a reboot: `kmutil unload -b com.apple.driver.AppleHDA`
+fails with `unsupported function`, and restarting `coreaudiod` does not rebuild the device.
+
+What is left in theory is a custom `Platforms` XML declaring a genuine multichannel device, which does need
+an AppleALC rebuild and therefore Xcode — plus crossover DSP software, which macOS does not provide. Neither
+step is proven to work. The practical alternative is a system-wide EQ, shaped from the measured curves.
 
 ## Why DAC 0x03, and why a daemon
 
@@ -155,6 +202,116 @@ Lower down there is still headroom in level, but also a cliff: at the codec maxi
 
 `CAP=0x52` follows from these two tables — at 200 Hz the output is already saturated by then, and at 120 Hz it
 is the least distorted of the measured points.
+
+## A hardware tone control
+
+macOS has no built-in EQ, but this machine has something almost as useful: **two independent DAC gains
+feeding two driver pairs with very different responses.**
+
+| | Node 0x14 → DAC 0x02 | Node 0x17 → DAC 0x03 |
+|---|---|---|
+| below 200 Hz | nothing | works from ~120 Hz |
+| 500 Hz | −42 dB | **−20 dB** |
+| 2 kHz | **−16.5 dB** | −23 dB |
+| 4 kHz | −36 dB | −28 dB |
+
+The upper pair carries the 2 kHz peak — the harshness — and produces nothing at the bottom. The lower pair
+covers 120 Hz to 1 kHz. So *changing their relative level is a tone control*, and it needs no software at all.
+
+[`scripts/woofer.sh`](../scripts/woofer.sh) maintains it:
+
+```
+gain(0x03) = max( system, min(system + OFFSET, CAP) )     # lower pair, boost only
+gain(0x02) = max( system − ATTEN, FLOOR )                 # upper pair, trim
+```
+
+Defaults: `OFFSET=16` (≈ +12 dB), `CAP=0x48`, `ATTEN=4` (≈ −3 dB), `FLOOR=0x20`.
+
+**Why `CAP=0x48`.** At 200 Hz the woofers saturate exactly there — measured, every value above it is identical
+within error. Pushing higher gains nothing at the bottom and only inflates 300 Hz–1 kHz, which is the boxy
+region. So the cap limits the *boost* and never attenuates: at high system volume the lower pair simply tracks
+the slider, because the driver is already at its limit.
+
+**Why `ATTEN` is small.** Trimming the upper pair hits the 2 kHz peak precisely — 12 steps drops 2 kHz by
+4.6 dB while 500 Hz falls only 1.1 dB, because 500 Hz comes from the *other* pair. But it also takes 4 kHz
+down with it: at 12 steps the top end lost 6.7 dB and the result was noticeably dull. Four steps trims the
+harshness without gutting the air.
+
+What this cannot do is the high-pass below 110 Hz or the shelf above 4.5 kHz — those still need a real EQ.
+Two of the five targets above are covered in hardware; the rest is software if you want it.
+
+### Tuning it by ear
+
+Three numbers at the top of `scripts/woofer.sh`, and the honest position is that measurement has taken this
+as far as it usefully can — a single microphone position cannot resolve the last few decibels, and absolute
+levels are not comparable between sessions. From here it is taste.
+
+| Change | Effect |
+|---|---|
+| `OFFSET` up | more bass at low and medium volume; no effect at high volume, where `CAP` binds |
+| `CAP` up | more midrange (300 Hz–1 kHz) but no more bass — 200 Hz is already saturated at `0x48` |
+| `ATTEN` up | less harshness at 2 kHz, but also less air at 4 kHz. Past ~5 steps it starts to sound dull |
+
+After editing:
+
+```bash
+sudo cp scripts/woofer.sh /usr/local/bin/
+sudo launchctl kickstart -k system/com.local.woofer
+```
+
+Changes take about 30 seconds to apply, and only after the volume slider moves — the daemon acts on the
+moment macOS sets both DACs to the same value.
+
+### Reading DAC gains is not always reliable
+
+`alc-verb 0x02 0xb 0x8000` occasionally returns `0x00000000` while audio is plainly playing at slider level.
+The daemon therefore only acts when **both** DACs read the same value — which is the signature of macOS having
+just set them from the volume slider — and refuses to act on anything below `FLOOR`.
+
+An earlier version computed the "system volume" from those same registers that it was itself writing. That is
+circular, and on the first bad read it drove both gains to zero and silenced the machine. If you adapt this
+script, keep that guard.
+
+## Equalisation: what to aim for
+
+A crossover is out of reach, so a system-wide EQ is what actually improves the sound. These are not
+guessed settings — they follow from the measured response.
+
+Combined response of both driver pairs at equal gain, relative to the 500 Hz–1 kHz average:
+
+| Hz | relative |
+|---|---|
+| 120 | **−31 dB** |
+| 160 | −21 dB |
+| 200 | −10 dB |
+| 300 | −2 dB |
+| 500 | +2 dB |
+| 800 | −1 dB |
+| 1000 | −0.5 dB |
+| 2000 | **+5 dB** |
+| 4000 | −6 dB |
+
+Below 120 Hz there is nothing at all, there is a broad plateau from 300 Hz to 1 kHz, a pronounced peak at
+2 kHz, and a drop above it.
+
+**The target:**
+
+| What | Where | How much | Why |
+|---|---|---|---|
+| High-pass | 110 Hz, steep (24 dB/oct) | — | Nothing below it but cone excursion and distortion. Removing it lets the drivers play louder cleanly — the single biggest gain here. |
+| Boost | 170 Hz, Q 1.0 | **+7 dB** | The lowest range the woofers still respond in. |
+| Cut | 500 Hz, Q 1.0 | **−3 dB** | The woofers' own peak; the source of boxiness. |
+| Cut | 2 kHz, Q 1.2 | **−5 dB** | The tweeters' peak; the source of harshness. |
+| High shelf | above 4.5 kHz | **+4 dB** | Restores the top end, which rolls off. |
+
+macOS has no built-in system EQ, so this needs third-party software — [eqMac](https://eqmac.app) is the usual
+free choice; SoundSource is the paid one. Both install a virtual audio device, which becomes the default
+output; worth doing when you are not about to need working sound.
+
+Treat these as a starting point and adjust by ear. The measurement is from a single microphone position
+10 cm away, so the fine structure — the exact height of the 2 kHz peak, the dip at 4 kHz — is partly room
+and cabinet reflection rather than pure driver response. The broad shape is reliable; individual decibels
+are not.
 
 ## Caveats
 

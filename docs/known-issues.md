@@ -13,11 +13,12 @@ The value of this list is mostly negative knowledge: time you do not have to spe
 
 ## Works, with a caveat
 
-### Bluetooth does not survive a reboot
+### Bluetooth can be slow to initialise
 
-`shutdown -r now` leaves the Intel controller dead. A full power-off and power-on fixes it. Hibernation is
-fine, because it cuts power anyway. Full detail, including how to tell "dead" from "switched off", is in
-[Wi-Fi and Bluetooth](wifi-and-bluetooth.md#the-one-caveat-it-does-not-survive-a-reboot).
+The Intel controller takes its time: the firmware uploads around 30 seconds into the boot and `State: On`
+can follow a minute later. Judge it by `Firmware Version` (`v0` = not up yet, `v256 c256` = alive), not by
+`State`, and do not measure in the first two minutes. Full detail in
+[Wi-Fi and Bluetooth](wifi-and-bluetooth.md#if-bluetooth-is-not-up-yet-give-it-time).
 
 ### Wi-Fi is not native
 

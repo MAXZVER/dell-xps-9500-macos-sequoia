@@ -109,31 +109,33 @@ bluetoothExternalDongleFailed     <00>
 bluetoothInternalControllerInfo   <0000000000000000000000000000>
 ```
 
-### The one caveat: it does not survive a reboot
+### If Bluetooth is not up yet, give it time
 
-The Intel controller only initialises when it receives power from cold. After `shutdown -r now` it comes up
-dead and stays dead; after a full power-off and pressing the power button it works.
-
-**How to tell the difference — look at `Firmware Version`, not `State`:**
+The Intel controller can take a while to initialise. **How to tell a slow start from a real failure — look at
+`Firmware Version`, not `State`:**
 
 ```
-working:          Address: XX:XX:XX:XX:XX:XX   State: On    Firmware: v256 c256
-just switched off: Address: NULL               State: Off   Firmware: v256 c256
-actually dead:     Address: NULL               State: Off   Firmware: v0
+working:            Address: XX:XX:XX:XX:XX:XX   State: On    Firmware: v256 c256
+just switched off:  Address: NULL                State: Off   Firmware: v256 c256
+firmware not up:    Address: NULL                State: Off   Firmware: v0
 ```
 
 `v256 c256` means the firmware uploaded and the controller is alive — `Address: NULL` then simply means
-Bluetooth is toggled off. **`v0` is the real failure.** In that state the log contains no
-`IOUSBHostDevice@…: IntelBluetoothFirmware selected configuration 1` line at all — the firmware upload never
-even begins — and `ioreg -r -c IntelBluetoothFirmware` shows `!registered, !matched`.
+Bluetooth is toggled off in Control Center. **`v0` means the firmware has not been uploaded yet.** In that
+state the log contains no `IOUSBHostDevice@…: IntelBluetoothFirmware selected configuration 1` line, and
+`ioreg -r -c IntelBluetoothFirmware` shows `!registered, !matched`.
 
-Two more things worth knowing:
+**Measure late, not early.** After a cold boot the firmware upload starts at roughly 30 seconds of uptime and
+`State: On` follows up to a minute later. Judging it before then produces a false "it is broken" — that
+happened repeatedly while writing this.
 
-- **Sleep is fine.** Hibernation cuts power, so waking is equivalent to a cold start. Only an explicit
-  restart breaks Bluetooth.
-- Give it time before judging. After a cold boot the firmware uploads at roughly 30 seconds of uptime and
-  `State: On` follows up to a minute later. Measuring too early produces a false "it is broken" — this
-  happened twice during development.
+During development one warm reboot left the controller at `v0` for the three minutes it was observed, which
+led to an earlier claim here that Bluetooth does not survive a reboot. **That claim was withdrawn** — the
+machine's owner reports it does come up after a normal reboot, and a three-minute window was not long enough
+to conclude otherwise. If yours is at `v0` well past that, a full power-off and power-on is a reliable way to
+get it back.
+
+Sleep is not a problem either way: hibernation cuts power, so waking is equivalent to a cold start.
 
 `Chipset: THIRD_PARTY_DONGLE` and `Vendor ID: 0x004C (Apple)` in System Information are just how BlueToolFixup
 presents the controller. Not a fault.
