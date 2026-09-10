@@ -225,7 +225,7 @@ gain(0x03) = max( system, min(system + OFFSET, CAP) )     # lower pair, boost on
 gain(0x02) = max( system − ATTEN, FLOOR )                 # upper pair, trim
 ```
 
-Defaults: `OFFSET=16` (≈ +12 dB), `CAP=0x48`, `ATTEN=4` (≈ −3 dB), `FLOOR=0x20`.
+Defaults: `OFFSET=16` (≈ +12 dB), `CAP=0x48`, `ATTEN=8` (≈ −6 dB), `FLOOR=0x20`.
 
 **Why `CAP=0x48`.** At 200 Hz the woofers saturate exactly there — measured, every value above it is identical
 within error. Pushing higher gains nothing at the bottom and only inflates 300 Hz–1 kHz, which is the boxy
@@ -234,8 +234,9 @@ the slider, because the driver is already at its limit.
 
 **Why `ATTEN` is small.** Trimming the upper pair hits the 2 kHz peak precisely — 12 steps drops 2 kHz by
 4.6 dB while 500 Hz falls only 1.1 dB, because 500 Hz comes from the *other* pair. But it also takes 4 kHz
-down with it: at 12 steps the top end lost 6.7 dB and the result was noticeably dull. Four steps trims the
-harshness without gutting the air.
+down with it: at 12 steps the top end lost 6.7 dB and the result was noticeably dull. Eight steps was settled on by ear — four was barely audible, twelve was
+dull. Measurement had reached its limit by then: a single microphone position cannot resolve the last few
+decibels, so the final value is a listening judgement, not a measured one.
 
 What this cannot do is the high-pass below 110 Hz or the shelf above 4.5 kHz — those still need a real EQ.
 Two of the five targets above are covered in hardware; the rest is software if you want it.

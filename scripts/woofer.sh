@@ -21,7 +21,7 @@ LOG=/var/log/woofer.log
 OFFSET=16        # na skolko shagov (po 0.75 dB) nizhnyaya para gromche sistemnoy gromkosti
 CAP=0x48         # potolok PODYOMA nizhney pary: na 200 Gc uroven nasyshchaetsya imenno zdes,
                  # vyshe podnimaetsya tolko seredina 300-1000 Gc - "korobochnost"
-ATTEN=4          # na skolko shagov tishe verhnyaya para: srezaet pik 2 kGc,
+ATTEN=8          # na skolko shagov tishe verhnyaya para: srezaet pik 2 kGc,
                  # no bolshe 4-5 shagov zametno gubit verh na 4 kGc (0 = ne trogat)
 
 log(){ echo "[$(date '+%F %T')] $*" >> "$LOG"; }
