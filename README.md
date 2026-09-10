@@ -20,6 +20,7 @@ The headline result: **sleep works.** Not "sort of works" — the machine surviv
 | External display (HDMI / USB-C) | ✅ Works | See [graphics](docs/graphics-and-display.md) |
 | Audio — speakers, headphones | ✅ Works | AppleALC `layout-id 13` |
 | Audio — **woofers / bass** | ✅ Works | Off by default in firmware — [how they were enabled](docs/woofers.md) |
+| Audio — system-wide EQ | ✅ Works | 32 bands inside the driver — [how](docs/building-applealc-without-xcode.md) |
 | Audio — internal microphone | ✅ Works | Needs a small helper, see [audio](docs/audio-keyboard-cardreader.md) |
 | **Wi-Fi** | ✅ Works | Intel AX201 via `itlwm` + HeliPort |
 | Wi-Fi — native macOS menu | ⛔ Not achievable | Requires OCLP root patching — [why](docs/wifi-and-bluetooth.md) |
@@ -96,6 +97,7 @@ redistributing them is copyright infringement. They are only needed for the nati
 | [Graphics and display](docs/graphics-and-display.md) | Framebuffer patches, disabling the dGPU, external monitors |
 | [USB mapping](docs/usb-mapping.md) | The port map and how it was built |
 | [Enabling the woofers](docs/woofers.md) | The 9500's bass speakers are disabled in firmware. Turning them on, with measurements |
+| [Building AppleALC without Xcode](docs/building-applealc-without-xcode.md) | A 32-band EQ inside the audio driver, and how to build a Lilu plugin with Command Line Tools only |
 | [Audio, keyboard, card reader](docs/audio-keyboard-cardreader.md) | Smaller fixes, including a Russian-layout annoyance |
 | [SMBIOS and Apple ID](docs/smbios.md) | Serial coherence, board-ID check, what to avoid |
 | [BIOS settings](docs/bios-settings.md) | What to change in Dell firmware |

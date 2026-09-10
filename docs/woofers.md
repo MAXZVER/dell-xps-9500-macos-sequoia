@@ -151,18 +151,46 @@ It means **do not use it.** Shifting level between the pairs de-balances a syste
 correctly, which is exactly what was heard: −6 dB on the upper pair sounded fine on bass-heavy material and
 put audible holes in dense rock. `SPREAD=0` is not a neutral compromise, it is the correct setting.
 
-### What is still missing: an EQ on the speaker path
+### The speaker EQ, inside the driver
 
-Both `DspFuncEQ` instances belong to the input chains. The speaker chain has the crossover and nothing else —
-no equalisation, no gain stage. That is the remaining gap, and the measured target curve above is what should
-go there.
+Both `DspFuncEQ` instances belong to the input chains. The speaker chain had the crossover and nothing else —
+no equalisation, no gain stage. That gap is now closed.
 
-Adding a `DspEqualization32` function to the `IntSpeaker` chain would give a **32-band EQ inside the driver**:
+Adding a `DspEqualization32` function to the `IntSpeaker` chain gives a **32-band EQ inside the driver**:
 system-wide, applying to every application, with no virtual audio device and no interference with the volume
-keys. It lives in the layout XML, which is a compiled resource, so it does need an AppleALC rebuild and
-therefore Xcode. Unlike the crossover attempt, this one has a clear mechanism — the format is right there in
-`Resources/ALC289/layout13.xml`, and the input chains show a working `DspEqualization32` with its `Filter`
-array to copy from.
+keys. The chain becomes
+
+```
+IntSpeaker -> SoftwareDSP
+    DspFunction0: DspEqualization32   instance 0, index 0     <- added
+    DspFunction1: DspCrossover2Way    instance 1, index 1
+```
+
+so the equalisation happens *before* the crossover splits the bands, which is the right order — the
+high-pass protects the woofers and the 2 kHz cut lands on the tweeters after the split.
+
+The layout is a compiled resource, so this needs an AppleALC rebuild. **It does not need Xcode**, contrary to
+what an earlier version of this document said: Command Line Tools plus MacKernelSDK are enough, the build
+takes about a minute, and the whole recipe — with the four traps that make a hand-rolled build fail — is in
+[Building AppleALC without Xcode](building-applealc-without-xcode.md). The patch and script are in
+[`tools/applealc-speaker-eq/`](../tools/applealc-speaker-eq/), including the
+[filter encoding](../tools/applealc-speaker-eq/README.md#the-filter-format), which is documented nowhere else.
+
+Confirmation that it instantiated, rather than merely being declared:
+
+```bash
+ioreg -l -w0 | grep -oE '"Dsp[A-Za-z0-9]+"=[0-9]+' | grep -v '=0$'
+```
+
+```
+"DspFuncEQ"            = 3      <- was 2 (mic and line-in); the third is ours
+"DspParameter"         = 60     <- was 56
+"DspFunc2WayCrossover" = 1      <- unchanged
+```
+
+By ear the machine sounds better. That is the honest strength of the claim — it is a listening judgement, not
+a measurement: the built-in microphone is not a usable instrument here, and the external-microphone rig was
+not available when this was fitted. The curve it carries *is* measured; the verdict on the result is not.
 
 ## Why DAC 0x03, and why a daemon
 
@@ -267,8 +295,8 @@ gain(0x02) = max( gain(0x03) − SPREAD, FLOOR )     # upper pair
 
 Defaults: `SPREAD=0` (neutral — see below), `CAP=0x52`, `FLOOR=0x20`.
 
-**Why `CAP=0x48`.** At 200 Hz the woofers saturate exactly there — measured, every value above it is identical
-within error. Pushing higher gains nothing at the bottom and only inflates 300 Hz–1 kHz, which is the boxy
+**Why `CAP=0x52`.** At 200 Hz the woofers saturate by `0x48` — measured, every value above it is identical
+within error — and of the points measured at 120 Hz, `0x52` was the least distorted. Pushing higher gains nothing at the bottom and only inflates 300 Hz–1 kHz, which is the boxy
 region. So the cap limits the *boost* and never attenuates: at high system volume the lower pair simply tracks
 the slider, because the driver is already at its limit.
 
@@ -351,8 +379,9 @@ script, keep that guard.
 
 ## Equalisation: what to aim for
 
-A crossover is out of reach, so a system-wide EQ is what actually improves the sound. These are not
-guessed settings — they follow from the measured response.
+The crossover turned out to be real and already running (above), so what remains is equalisation. These are
+not guessed settings — they follow from the measured response, and they are the curve now fitted in the
+driver.
 
 Combined response of both driver pairs at equal gain, relative to the 500 Hz–1 kHz average:
 
@@ -381,9 +410,11 @@ Below 120 Hz there is nothing at all, there is a broad plateau from 300 Hz to 1 
 | Cut | 2 kHz, Q 1.2 | **−5 dB** | The tweeters' peak; the source of harshness. |
 | High shelf | above 4.5 kHz | **+4 dB** | Restores the top end, which rolls off. |
 
-macOS has no built-in system EQ, so this needs third-party software — [eqMac](https://eqmac.app) is the usual
-free choice; SoundSource is the paid one. Both install a virtual audio device, which becomes the default
-output; worth doing when you are not about to need working sound.
+macOS has no built-in system EQ. The route taken here puts this curve **inside the driver** — see
+[the speaker EQ](#the-speaker-eq-inside-the-driver) — which costs an AppleALC rebuild but needs nothing
+running in userspace. If you would rather not rebuild, [eqMac](https://eqmac.app) is the usual free choice
+and SoundSource the paid one; both install a virtual audio device that becomes the default output, so fit
+them when you are not about to need working sound.
 
 Treat these as a starting point and adjust by ear. The measurement is from a single microphone position
 10 cm away, so the fine structure — the exact height of the 2 kHz peak, the dip at 4 kHz — is partly room
