@@ -101,6 +101,7 @@ redistributing them is copyright infringement. They are only needed for the nati
 | [Audio, keyboard, card reader](docs/audio-keyboard-cardreader.md) | Smaller fixes, including a Russian-layout annoyance |
 | [SMBIOS and Apple ID](docs/smbios.md) | Serial coherence, board-ID check, what to avoid |
 | [BIOS settings](docs/bios-settings.md) | What to change in Dell firmware |
+| [Trackpad gestures and Safari](docs/trackpad-and-safari.md) | Four-finger tap as a middle click, and what Safari can and cannot do with tabs |
 | [Known issues](docs/known-issues.md) | What does not work and what was ruled out |
 | [Troubleshooting](docs/troubleshooting.md) | How to diagnose, with real log signatures |
 
