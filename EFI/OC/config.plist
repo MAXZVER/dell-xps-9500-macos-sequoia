@@ -1757,7 +1757,7 @@
 				<key>Auxiliary</key>
 				<false/>
 				<key>Comment</key>
-				<string></string>
+				<string>Example dual-boot entry. The device path is machine specific - get yours from the OpenCore boot picker log or bcfg, do not copy this one.</string>
 				<key>Enabled</key>
 				<true/>
 				<key>Flavour</key>
