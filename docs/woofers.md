@@ -227,7 +227,7 @@ gain(0x03) = min( system, CAP )                    # lower pair
 gain(0x02) = max( gain(0x03) − SPREAD, FLOOR )     # upper pair
 ```
 
-Defaults: `SPREAD=8` (≈ +6 dB), `CAP=0x52`, `FLOOR=0x20`.
+Defaults: `SPREAD=0` (neutral — see below), `CAP=0x52`, `FLOOR=0x20`.
 
 **Why `CAP=0x48`.** At 200 Hz the woofers saturate exactly there — measured, every value above it is identical
 within error. Pushing higher gains nothing at the bottom and only inflates 300 Hz–1 kHz, which is the boxy
@@ -263,6 +263,25 @@ sudo launchctl kickstart -k system/com.local.woofer
 
 Changes take about 30 seconds to apply, and only after the volume slider moves — the daemon acts on the
 moment macOS sets both DACs to the same value.
+
+### The honest outcome: neutral
+
+`SPREAD` defaults to **0**, and that is a result, not laziness.
+
+Eight steps (−6 dB on the upper pair) sounds good on hip-hop, where the energy sits low. On dense rock it does
+not: tested on Linkin Park's *Numb*, it produced audible holes in the sound. The midrange and treble from
+2–8 kHz come from the upper pair, and any trim eats into them. At zero it sounds right.
+
+The reason is the one thing that cannot be fixed here: **both pairs receive the full-range signal, with no
+crossover.** Trading level between them is a compromise, not a fix. Boost the woofers and the 300 Hz–1 kHz
+region inflates; trim the tweeters and the upper midrange thins out. There is no setting that is right for all
+material, which is exactly what a crossover would have solved.
+
+So the daemon ships neutral. With `SPREAD=0` its only remaining job is restoring node `0x17`'s pin
+configuration if the codec resets it — a safety net, since the boot-time `ConfigData` already sets it.
+
+If you do want more bass: 2–4 steps is tolerable, 8 is audible on rock, 12 costs 6.7 dB at 4 kHz (measured).
+It is a taste knob, and the measurements above tell you what each step costs.
 
 ### One knob, not two
 

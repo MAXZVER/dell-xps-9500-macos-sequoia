@@ -21,13 +21,20 @@
 A=/usr/local/bin/alc-verb
 LOG=/var/log/woofer.log
 
-SPREAD=8         # na skolko shagov (po 0.75 dB) nizhnyaya para gromche verhney.
-                 # Edinstvennaya ruchka tembra, odinakovaya na lyuboy gromkosti.
-                 # Ranshe skladyvalis "podyom nizhney" i "priglushenie verhney",
-                 # i razbros vyhodil 18 dB na tihoy (gudelo) i 6 dB na gromkoy
-                 # (zvuchalo horosho) - poetomu teper odna velichina.
-                 # 4 shaga pochti ne slyshno, 8 - horosho, 12 - glohnet verh
-                 # (-6.7 dB na 4 kGc, izmereno).
+SPREAD=0         # na skolko shagov (po 0.75 dB) nizhnyaya para gromche verhney.
+                 #
+                 # PO UMOLCHANIYU NOL, i eto rezultat proverki na sluh, a ne lenost.
+                 # 8 shagov (-6 dB verhney pare) horosho zvuchat na hip-hope, no na
+                 # plotnoy rok-muzyke (proveryali na Linkin Park - Numb) poyavlyayutsya
+                 # provaly: seredina i verh 2-8 kGc idut imenno s verhney pary, i lyuboe
+                 # eyo priglushenie vyedaet ih. Na nule zvuchit pravilno.
+                 #
+                 # Prichina v tom, chto obe pary poluchayut POLNOPOLOSNYY signal bez
+                 # razdeleniya chastot. Krutit uroven - kompromiss, a ne reshenie;
+                 # reshenie eto krossover, no on nedostizhim (sm. dokumentaciyu).
+                 #
+                 # Esli vsyo zhe hochetsya basa: 2-4 shaga terpimo, 8 slyshno na roke,
+                 # 12 glushit verh na 6.7 dB na 4 kGc (izmereno).
 
 CAP=0x52         # potolok nizhney pary: vyshe na 120 Gc rezko rastut iskazheniya
                  # (57% THD na 0x57 - dinamik uhodit v otboy).
@@ -77,7 +84,7 @@ print('0x%02x 0x%02x' % (lo, hi))
 
   # posle probuzhdeniya pin uzla 0x17 inogda sbrasyvaetsya - vosstanavlivaem
   if [ "$(v 0x17 0xf1c 0)" = "0x411111f0" ]; then
-    v 0x17 0x71c 0x11 >/dev/null; v 0x17 0x71d 0x01 >/dev/null
+    v 0x17 0x71c 0x11 >/dev/null; v 0x17 0x71d 0x01 >/dev/null   # 0x90170111, kak v kekste
     v 0x17 0x71e 0x17 >/dev/null; v 0x17 0x71f 0x90 >/dev/null
     log "pin 0x17 vosstanovlen"
   fi
