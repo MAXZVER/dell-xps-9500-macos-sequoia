@@ -50,17 +50,42 @@ speaker EQ instantiated.
 
 ## The curve
 
-Derived from measurements taken with an external microphone — see
-[docs/woofers.md](../../docs/woofers.md#measurements). It is a starting point, not a final answer.
+Derived from the speakers' own response, measured with three microphone positions averaged by power — see
+[measuring speakers](../measure/README.md) for the method and [woofers.md](../../docs/woofers.md#measurements)
+for the numbers.
 
-| Band | Type | Frequency | Q | Gain |
-|---|---|---|---|---|
-| 0 | high-pass | 110 Hz | 0.7071 | −3.01 dB |
-| 4 | parametric | 170 Hz | 1.0 | **+7 dB** |
-| 10 | parametric | 500 Hz | 1.0 | −3 dB |
-| 18 | parametric | 2000 Hz | 1.2 | −5 dB |
-| 24 | parametric | 7000 Hz | 0.7 | +4 dB |
-| 31 | low-pass | 19000 Hz | 0.7071 | −3.01 dB |
+| Band | Type | Frequency | Q | Gain | Why |
+|---|---|---|---|---|---|
+| 0 | high-pass | 110 Hz | 0.7071 | −3.01 dB | below this the cones move without producing sound |
+| 4 | parametric | 170 Hz | 0.9 | **+8 dB** | the lowest range the woofers still answer in |
+| 10 | parametric | 630 Hz | 2.0 | +4 dB | partial fill of a dip that is the same from every position |
+| 18 | parametric | 1800 Hz | 1.0 | **−7 dB** | the 1.25–2 kHz rise; the most reliably measured feature |
+| 24 | parametric | 7000 Hz | 0.7 | +4 dB | top end — **unverified**, this rig cannot measure up there |
+| 31 | low-pass | 19000 Hz | 0.7071 | −3.01 dB | |
+
+To change it, edit `BANDS` in [`set-eq.py`](set-eq.py) and run it against
+`Resources/ALC289/layout13.xml`; it rewrites the `Filter` block in place, line by line, so the diff stays
+readable instead of the whole file being reformatted by `plistlib`.
+
+### Verified, not assumed
+
+Measured with the EQ engaged and with a stock AppleALC, from the same microphone position, and compared
+against what the filters should produce:
+
+```
+average error 0.7 dB, worst 2.2 dB   (rig repeats to +-1.5 dB)
+```
+
+The driver does what the curve says. What the curve *should* say is the harder question, and one earlier
+answer was wrong: a −3 dB cut at 500 Hz, put there because a single-position measurement showed a peak.
+Averaging three positions showed a **dip** of −4.9 dB. That band is gone.
+
+Two residuals cannot be fixed by equalisation and are left alone:
+
+- **200 Hz, −11 dB.** The driver is at its limit; the boost already raised distortion at 200 Hz from 2.1 %
+  to 3.9 %. More gain buys distortion, not output.
+- **630 Hz, −6 dB.** Consistent across every microphone position, which points at phase cancellation where
+  the crossover hands over, not at a level problem. Filled only partially.
 
 ## The filter format
 

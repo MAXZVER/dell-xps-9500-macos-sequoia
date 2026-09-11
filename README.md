@@ -28,7 +28,7 @@ The headline result: **sleep works.** Not "sort of works" — the machine surviv
 | USB 3 / Type-C / Thunderbolt 3 | ✅ Works | Mapped, 15-port limit respected |
 | Trackpad (I²C, gestures) | ✅ Works | VoodooI2C |
 | Keyboard, brightness/volume keys | ✅ Works | VoodooPS2 |
-| SD card reader | ✅ Works | Sinetek-rtsx |
+| SD card reader | ✅ Works | RTS5260 — needs RealtekCardReader, **not** Sinetek-rtsx ([why](docs/audio-keyboard-cardreader.md#sd-card-reader)) |
 | Battery status, sensors, fans | ✅ Works | VirtualSMC + SMCDellSensors |
 | Webcam | ✅ Works | |
 | Fingerprint reader | ⛔ Never | No macOS driver, no prospect of one |

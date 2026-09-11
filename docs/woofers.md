@@ -188,9 +188,18 @@ ioreg -l -w0 | grep -oE '"Dsp[A-Za-z0-9]+"=[0-9]+' | grep -v '=0$'
 "DspFunc2WayCrossover" = 1      <- unchanged
 ```
 
-By ear the machine sounds better. That is the honest strength of the claim — it is a listening judgement, not
-a measurement: the built-in microphone is not a usable instrument here, and the external-microphone rig was
-not available when this was fitted. The curve it carries *is* measured; the verdict on the result is not.
+**It has since been verified by measurement, not just by ear.** Recording the same test signal with the EQ
+engaged and with a stock AppleALC, from the same microphone position, and subtracting the two removes both
+the microphone's own response and most of the room interference. What remains is what the EQ did:
+
+```
+average error 0.7 dB, worst 2.2 dB      against a rig that repeats to +-1.5 dB
+```
+
+So the driver applies the designed curve accurately. Choosing the right curve is the harder half, and it is
+covered under [what to aim for](#equalisation-what-to-aim-for) — including one band that measurement proved
+wrong. The method, and the four ways the analysis can fool you, are in
+[tools/measure](../tools/measure/README.md).
 
 ## Why DAC 0x03, and why a daemon
 
@@ -400,17 +409,63 @@ Combined response of both driver pairs at equal gain, relative to the 500 Hz–1
 Below 120 Hz there is nothing at all, there is a broad plateau from 300 Hz to 1 kHz, a pronounced peak at
 2 kHz, and a drop above it.
 
-**The target:**
+**The target, after proper measurement:**
+
+The table that used to stand here was derived from a single microphone position, and one of its entries was
+wrong. Three positions averaged by power give this response for the speakers alone, relative to
+800–1250 Hz — the *spread* column is the difference between positions, and it is the column that decides
+what may be equalised at all:
+
+| Hz | relative | spread | reading |
+|---|---|---|---|
+| 200 | −19.6 | 6.5 | the bottom really is gone |
+| 250 | −10.6 | 6.4 | |
+| 315 | −4.8 | 6.9 | |
+| **400** | **+0.4** | 6.5 | local maximum |
+| **500** | **−4.9** | 10.6 | **a dip, not a peak** |
+| **630** | **−10.8** | **3.1** | deep, and *identical from every position* |
+| 1250 | +3.0 | 12.9 | |
+| 1600 | +3.4 | 8.6 | |
+| **2000** | **+6.5** | 6.2 | the peak is real |
+| 2500 | +1.2 | 5.0 | |
+
+**The correction.** The earlier version cut 500 Hz by 3 dB, calling it "the woofers' own peak, the source of
+boxiness". Averaging shows a **dip** of −4.9 dB there. We were deepening a hole. That band is removed.
+
+**The find.** The 630 Hz dip has the *smallest* spread in the table. Everything else moves by 6–13 dB when
+the microphone moves; this does not. That is the signature of a real system property rather than room
+interference — and at that frequency, in a two-way system, the obvious candidate is phase cancellation where
+the crossover hands over. Level cannot properly fix a phase problem, so it is filled only partially.
+
+So the curve now fitted in the driver is:
 
 | What | Where | How much | Why |
 |---|---|---|---|
-| High-pass | 110 Hz, steep (24 dB/oct) | — | Nothing below it but cone excursion and distortion. Removing it lets the drivers play louder cleanly — the single biggest gain here. |
-| Boost | 170 Hz, Q 1.0 | **+7 dB** | The lowest range the woofers still respond in. |
-| Cut | 500 Hz, Q 1.0 | **−3 dB** | The woofers' own peak; the source of boxiness. |
-| Cut | 2 kHz, Q 1.2 | **−5 dB** | The tweeters' peak; the source of harshness. |
-| High shelf | above 4.5 kHz | **+4 dB** | Restores the top end, which rolls off. |
+| High-pass | 110 Hz, Q 0.71 | — | Nothing below it but cone excursion and distortion. |
+| Boost | 170 Hz, Q 0.9 | **+8 dB** | The lowest range the woofers still answer in. |
+| Fill | 630 Hz, Q 2.0 | **+4 dB** | Partial, for the reason above. |
+| Cut | 1800 Hz, Q 1.0 | **−7 dB** | The 1.25–2 kHz rise — the most reliably measured feature here. |
+| Boost | 7000 Hz, Q 0.7 | **+4 dB** | Top end. **Unverified** — see the caveat below. |
+| Low-pass | 19 kHz, Q 0.71 | — | |
+
+Weighted deviation across 250 Hz–2.5 kHz: **5.9 dB with no EQ, 4.4 dB with the old curve, 3.0 dB with this
+one.** The old curve helped much less than it appeared to, because the mistaken 500 Hz cut was working
+against the rest of it.
+
+**What cannot be fixed, and why more EQ is the wrong answer:**
+
+- **200 Hz stays at −11 dB.** The driver is at its limit. The +8 dB boost already took distortion at 200 Hz
+  from 2.1 % to 3.9 %. A grid search over curve parameters found +9 dB "better" on paper; it buys distortion,
+  not output.
+- **630 Hz stays at −6 dB.** See above — it is phase, not level.
+
+**The top end is not measured.** Above 3 kHz this rig scatters by 4–7 dB *between two runs with nothing
+touched*, so the +4 dB at 7 kHz is inherited from the earlier single-position work and left alone
+deliberately: there is no evidence to change it either way. If you have a real measurement microphone, this
+is the first thing worth revisiting.
 
 macOS has no built-in system EQ. The route taken here puts this curve **inside the driver** — see
+
 [the speaker EQ](#the-speaker-eq-inside-the-driver) — which costs an AppleALC rebuild but needs nothing
 running in userspace. If you would rather not rebuild, [eqMac](https://eqmac.app) is the usual free choice
 and SoundSource the paid one; both install a virtual audio device that becomes the default output, so fit

@@ -31,7 +31,7 @@
 | USB 3 / Type-C / Thunderbolt 3 | ✅ | Карта портов, предел в 15 портов соблюдён |
 | Тачпад (I²C, жесты) | ✅ | VoodooI2C |
 | Клавиатура, клавиши яркости и громкости | ✅ | VoodooPS2 |
-| Картридер SD | ✅ | Sinetek-rtsx |
+| Картридер SD | ✅ | RTS5260 — нужен RealtekCardReader, а **не** Sinetek-rtsx ([почему](docs/ru/audio-keyboard-cardreader.md#картридер-sd)) |
 | Батарея, датчики, вентиляторы | ✅ | VirtualSMC + SMCDellSensors |
 | Веб-камера | ✅ | |
 | Сканер отпечатка | ⛔ Никогда | Драйвера нет и не предвидится |
