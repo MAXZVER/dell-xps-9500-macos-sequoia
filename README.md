@@ -102,7 +102,7 @@ redistributing them is copyright infringement. They are only needed for the nati
 | [SMBIOS and Apple ID](docs/smbios.md) | Serial coherence, board-ID check, what to avoid |
 | [BIOS settings](docs/bios-settings.md) | What to change in Dell firmware |
 | [Trackpad gestures and Safari](docs/trackpad-and-safari.md) | Four-finger tap as a middle click, and what Safari can and cannot do with tabs |
-| [Yandex.Disk sync without a background daemon](docs/yandex-sync.md) | Event-driven sync, and a three-way merge UI for conflicts — including Office files |
+| [cloudsync-macos](https://github.com/MAXZVER/cloudsync-macos) ↗ | Selective cloud sync with a three-way merge for conflicts. Written here, moved out — none of it is XPS-specific |
 | [Known issues](docs/known-issues.md) | What does not work and what was ruled out |
 | [Troubleshooting](docs/troubleshooting.md) | How to diagnose, with real log signatures |
 
